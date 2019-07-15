@@ -1,0 +1,11 @@
+Package: SCINET
+Type: Package
+Title: Single-Cell Imputation and NETwork inference
+Version: 1.0
+Date: 2018-06-01
+Author: Shahin Mohammadi
+Maintainer: Shahin Mohammadi <mohammadi@broadinstitute.org>
+Description: This method computes a distribution over edges of a scaffold network and allows to perform differential network analysis
+License: GPL (>= 2)
+Imports: Rcpp (>= 0.12.12)
+LinkingTo: Rcpp,RcppArmadillo

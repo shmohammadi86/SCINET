@@ -1,0 +1,3 @@
+useDynLib(SCINET, .registration=TRUE)
+exportPattern("^[[:alpha:]]+")
+importFrom(Rcpp, evalCpp)
