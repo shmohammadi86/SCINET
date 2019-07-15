@@ -1,4 +1,4 @@
 SOURCES=$(wildcard SCINET_core/*.cc)
 OBJECTS=SCINET.o RcppExports.o $(SOURCES:.cc=.o)
 PKG_LIBS=$(SHLIB_OPENMP_CXXFLAGS) $(BLAS_LIBS) $(LAPACK_LIBS) -lpthread -lm 
-PKG_CXXFLAGS=`find ../inst/include -type d | sed s/^/-I/` $(SHLIB_OPENMP_CXXFLAGS) -w -msse2 -DUSE_BLAS_LIB -DAXPBY -DINT_64BITS -DARMA_64BIT_WORD
+PKG_CXXFLAGS=-I"../inst/include" -I"../inst/include/stats" $(SHLIB_OPENMP_CXXFLAGS) -w -msse2 -DUSE_BLAS_LIB -DAXPBY -DINT_64BITS -DARMA_64BIT_WORD
