@@ -1,0 +1,218 @@
+---
+title: "SCINET demo"
+output:
+  html_document:
+    df_print: paged
+---
+
+## Housekeeping
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+	echo = TRUE,
+	message = FALSE,
+	warning = FALSE
+)
+
+require(SCINET)
+
+# For testing purposes
+Bcell.cols = which(sce$CellType == "B cell")
+marker.genes = c('CD19', 'CD22', 'CD4', 'CD8A', 'CD14')
+marker.rows = match(marker.genes, rownames(sce))
+
+```
+
+
+## Preprocessing using ACTIONet framework
+```{r message=FALSE, warning=FALSE}
+sce = readRDS('../../input/datasets/Ding2019/HumanPBMC.RDS')
+
+
+```
+
+
+## Imputation
+```{r}
+# depth = 20
+# thread_no = 8
+# sce = reduce.sce(sce)
+# ACTIONet.out = run.ACTIONet(sce, k_max = depth, thread_no = thread_no)
+# 
+# save(sce, ACTIONet.out, file = 'Ding_PBMC.RData')
+
+load('Ding_PBMC.RData')
+
+W = ACTIONet.out$signature.profile[, ACTIONet.out$core.out]
+H = ACTIONet.out$reconstruct.out$H_stacked[ACTIONet.out$core.out$core.archs, ]
+A =  W %*% H
+
+```
+
+
+## Estimate gene activity score within B-cell sub-population
+```{r}
+# It can be any imputed profile
+
+activity.scores = SCINET::compute_gene_activities(A = A, samples = Bcell.cols, thread_no = 8)
+
+X = t(activity.scores[marker.rows, ])
+
+colnames(X) = marker.genes
+df = reshape2::melt(X)
+colnames(df) = c('id', 'gene', 'activity')
+
+require(ggplot2)
+ggplot(df, aes(x=activity, fill=gene)) +
+  geom_density()
+
+
+## Estimate gene activities within the ACTIONet framework
+activity.scores.ACTIONet = compute_gene_activities_decoupled(archetypes = ACTIONet.out$signature.profile, H = ACTIONet.out$reconstruct.out$H_stacked , samples = Bcell.cols, thread_no = 8)
+
+# Results should be identical
+delta.df = data.frame(ACTIONet = activity.scores.ACTIONet[marker.genes[1], ], generic = activity.scores[marker.genes[1], ])
+delta = delta.df$ACTIONet - delta.df$generic
+sum(delta)
+
+```
+
+
+
+## Load GAAD network as the reference interactome 
+Downloaded from [GAAD](http://gaad.medgenius.info/Downloads/co-occurrence_of_gene_pairs_in_ADs.txt.gz)
+
+```{r}
+G = readRDS('GAAD_net.RDS')
+paired.datasets = pair.datasets(G, activity.scores)
+
+EL = get.edgelist(G, names = FALSE)
+
+G.adj = as(get.adjacency(paired.datasets$net), 'dgTMatrix')
+
+edge.idx = (G.adj@i)*nrow(G.adj) + (G.adj@j+1)
+
+```
+
+
+
+## Unscaffolded networks, generic expression
+```{r}
+# Construct B-cell specific all-to-all networks for the first 30 B-cell samples
+Bcell.nets = construct_cell_networks_noPrior(gene_activities = paired.datasets$activity.scores[, 1:30], thread_no = 8)
+
+
+## Aggregate networks and compute stats
+# Mu = Reduce("+", Bcell.nets) / length(Bcell.nets)
+# Delta = lapply(Bcell.nets, function(X) (X - Mu)^2)
+# Sigma = Reduce("+", Delta) / length(Bcell.nets)
+
+netTensor = array( unlist(Bcell.nets) , c(length(paired.datasets$genes), length(paired.datasets$genes), length(Bcell.nets)) )
+
+Mu = apply( netTensor , 1:2 , mean )
+Sigma = apply( netTensor , 1:2 , sd )
+
+CV = Sigma / Mu
+CV[is.na(CV)] = 0
+CV[is.infinite(CV)] = 0
+
+
+# Print top-20 most significant topologically specific genes
+pdf('noRef_edge_mean.pdf')
+plot(density(as.numeric(Mu)))
+dev.off()
+
+Bcell.net.noRef.graph = graph_from_adjacency_matrix(Mu, mode = "undirected", weighted = TRUE)
+
+topo.spec.noRef = topo.spec(Bcell.net.noRef.graph, sample_no = 100)
+print(paired.datasets$genes[order(topo.spec.noRef, decreasing = TRUE)[1:20]])
+
+
+## Print top-20 most variable genes in terms of interactions
+
+pdf('noRef_edge_std.pdf')
+plot(density(as.numeric(Sigma)))
+dev.off()
+
+
+Bcell.net.noRef.var.graph = graph_from_adjacency_matrix(CV, mode = "undirected", weighted = TRUE)
+
+var.topo.spec.noRef = topo.spec(Bcell.net.noRef.var.graph, sample_no = 100)
+print(paired.datasets$genes[order(var.topo.spec.noRef, decreasing = TRUE)[1:20]])
+
+
+write.table(paired.datasets$genes[order(var.topo.spec.noRef, decreasing = TRUE)], file = "var_genes_cv.txt", row.names = FALSE, col.names = FALSE, quote = FALSE)
+
+
+```
+
+
+## Use GAAD network as reference
+```{r}
+# Construct B-cell specific reference-based networks for the first 30 B-cell samples
+Bcell.nets.ref = construct_cell_networks(net = G.adj, gene_activities = paired.datasets$activity.scores[, 1:10], thread_no = 8)
+
+
+## Aggregate networks and compute stats
+Mu.ref = Reduce("+", Bcell.nets.ref) / length(Bcell.nets.ref)
+
+Bcell.net.withRef.graph = graph_from_adjacency_matrix(Mu.ref, mode = "undirected", weighted = TRUE)
+
+topo.spec.withRef = topo.spec(Bcell.net.withRef.graph, sample_no = 100)
+print(paired.datasets$genes[order(topo.spec.withRef, decreasing = TRUE)[1:20]])
+
+```
+
+## Subsampling gene activities
+```{r}
+subsampled.activity.scores = subsample_gene_activities(A = A, rows = 1:nrow(A), samples = Bcell.cols, thread_no = 8, total_subsamples = 30, cells_per_subsample = 10, seed = 0)
+
+rownames(subsampled.activity.scores) = rownames(A)
+
+paired.datasets.subsampled = pair.datasets(G, subsampled.activity.scores)
+
+```
+
+## Run SCINET on the subsamples
+```{r}
+# Construct B-cell specific reference-based networks for the first 30 B-cell samples
+Bcell.nets.ref.subsampled = construct_cell_networks(net = G.adj, gene_activities = paired.datasets.subsampled$activity.scores, thread_no = 8)
+
+
+## Aggregate networks and compute stats
+Mu.ref.subsampled = Reduce("+", Bcell.nets.ref.subsampled) / length(Bcell.nets.ref.subsampled)
+
+Bcell.net.withRef.subsampled.graph = graph_from_adjacency_matrix(Mu.ref.subsampled, mode = "undirected", weighted = TRUE)
+
+topo.spec.withRef.subsampled = topo.spec(Bcell.net.withRef.subsampled.graph, sample_no = 100)
+print(paired.datasets$genes[order(topo.spec.withRef.subsampled, decreasing = TRUE)[1:20]])
+
+```
+
+
+
+## Use subsampling
+```{r}
+# Construct B-cell specific reference-based networks for the first 30 B-cell samples
+Bcell.nets.ref.subsampled.aggregated = construct_cell_networks_summary(net = G.adj, gene_activities = paired.datasets.subsampled$activity.scores, thread_no = 8, total_subsamples = 30, cells_per_subsample = 10, seed = 0)
+
+
+## Aggregate networks and compute stats
+Mu.ref.subsampled.aggregated = Reduce("+", Bcell.nets.ref.subsampled.aggregated) / length(Bcell.nets.ref.subsampled.aggregated)
+
+Bcell.net.withRef.subsampled.aggregated.graph = graph_from_adjacency_matrix(Mu.ref.subsampled.aggregated, mode = "undirected", weighted = TRUE)
+
+topo.spec.withRef.subsampled.aggregated = topo.spec(Bcell.net.withRef.subsampled.aggregated.graph, sample_no = 100)
+print(paired.datasets$genes[order(topo.spec.withRef.subsampled.aggregated, decreasing = TRUE)[1:20]])
+
+```
+
+
+```{r}
+X = cbind(topo.spec.noRef=topo.spec.noRef, topo.spec.withRef=topo.spec.withRef, topo.spec.withRef.subsampled=topo.spec.withRef.subsampled, topo.spec.withRef.subsampled.aggregated=topo.spec.withRef.subsampled.aggregated)
+
+CC = cor(X)
+ComplexHeatmap::Heatmap(CC)
+
+```
+

@@ -1,0 +1,8 @@
+libscinet.a
+Rpackage/bin/libscinet.a
+scinet*
+*.o
+*.so
+matlab/*.mexa64
+*.RData
+*.RDS
