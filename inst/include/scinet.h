@@ -34,6 +34,7 @@ namespace SCINET {
 	// Computes transformed gene activity scores for each sample
 	mat compute_gene_activities(mat A, uvec samples, bool consider_baseline_expression, int thread_no);
 	mat compute_gene_activities_decoupled(mat archetypes, mat H, uvec samples, bool consider_baseline_expression, int thread_no);
+	mat compute_gene_activities_full(mat A, int thread_no);
 		
 	// Computes transformed gene activity scores using subsampling
 	mat subsample_gene_activities(mat A, uvec rows, uvec samples, int total_subsamples, int cells_per_subsample, int thread_no, int seed);

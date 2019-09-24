@@ -9,6 +9,10 @@ compute_gene_activities_decoupled <- function(archetypes, H, samples, consider_b
     .Call(`_SCINET_compute_gene_activities_decoupled`, archetypes, H, samples, consider_baseline_expression, thread_no)
 }
 
+compute_gene_activities_full <- function(A, thread_no = 4L) {
+    .Call(`_SCINET_compute_gene_activities_full`, A, thread_no)
+}
+
 subsample_gene_activities <- function(A, rows, samples, total_subsamples = 30L, cells_per_subsample = 10L, thread_no = 4L, seed = 0L) {
     .Call(`_SCINET_subsample_gene_activities`, A, rows, samples, total_subsamples, cells_per_subsample, thread_no, seed)
 }

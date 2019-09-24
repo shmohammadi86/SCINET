@@ -39,6 +39,16 @@ mat compute_gene_activities_decoupled(mat archetypes, mat H, uvec samples, bool 
 
 // [[Rcpp::depends(RcppArmadillo)]]
 // [[Rcpp::export]]
+mat compute_gene_activities_full(mat A, int thread_no = 4) {
+	mat Z = SCINET::compute_gene_activities_full(A, thread_no);
+	
+	return Z;		
+}
+
+
+
+// [[Rcpp::depends(RcppArmadillo)]]
+// [[Rcpp::export]]
 mat subsample_gene_activities(mat A, uvec rows, uvec samples, int total_subsamples = 30, int cells_per_subsample = 10, int thread_no = 4, int seed = 0) {		
 	int K = samples.n_elem;
 	int M = rows.n_elem;
