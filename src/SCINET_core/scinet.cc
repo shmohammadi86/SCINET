@@ -426,8 +426,9 @@ namespace SCINET {
 				
 				pvals(l) = pval;
 			}
-					
-			pvals.transform( [](double val) { return (val < 1e-300?1e-300:val); } );
+			
+			pvals = clamp(pvals, 1e-300, 1);
+			//pvals.transform( [](double val) { return (val < 1e-300?1e-300:val); } );
 			
 			pvals_mat.col(k) = pvals;
 
