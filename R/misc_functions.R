@@ -94,6 +94,59 @@ compute.genesets.compactness <- function(G, genesets, sample_no = 100, min.genes
 }
 
 
+
+prioritize.geneset.LOO <- function(G, geneset, sample_no = 100) {
+  # From: "Systematic Evaluation of Molecular Networks for Discovery of Disease Genes"
+  nonisolated.vertices = which(degree(G) > 0)
+  G = induced_subgraph(G, V(G)[nonisolated.vertices])
+  genes = V(G)$name
+
+  gene.score = array(-Inf, N)
+  rownames(gene.score) = geneset
+  
+  set.seed(0)
+  
+  m=-0.02935302
+  b=0.74842057
+  log_edge_count = log10(length(E(G)))
+  alpha_val = m*log_edge_count+b
+
+  # Symmetric transition matrix
+  A = get.symPR.matrix(get.adjacency(G), alpha_val)
+  Q = solve (as.matrix(A))
+
+  N = length(genes)
+  
+  specificity = V(G)$specificity # Z-score
+  names(specificity) = genes
+  specificity = 1 / (1 + exp(-specificity))
+
+  seeds = intersect(geneset, genes)
+  seed_ids = match(seeds, genes) 
+
+  rest = setdiff(1:N, seed_ids)  
+  for (i in 1:length(seeds)) {
+    seed_id = seed_ids[i]
+    idx = setdiff(seed_ids, seed_id)
+
+    e_gs = as.numeric(sparseVector(specificity[idx], idx, N));
+    e_gs = e_gs / sum(e_gs)
+
+    scores = (1-alpha_val)*Q%*%e_gs
+    mu = mean(scores[rest])
+    sigma = sd(scores[rest])
+
+    current_seed_name = seeds[i]
+    gene.score[seeds[i]] = ( scores[seed_id] - mu ) / sigma
+  }
+
+  
+  return(gene.score)
+}
+
+
+
+
 read.edgelist <- function(fname, header = TRUE, src.col = 1, dst.col = 2) {
   EdgeList = read.table(fname, sep = '\t', as.is = TRUE, header = header)
   src = EdgeList[, src.col]

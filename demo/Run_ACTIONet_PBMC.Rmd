@@ -1,0 +1,67 @@
+---
+title: "Run ACTIONet on the PBMC dataset"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+	echo = TRUE,
+	message = FALSE,
+	warning = FALSE
+)
+require(SingleCellExperiment)
+require(ACTIONet)
+
+dir.create('results/PBMC_Basics/')
+
+```
+
+## Load data
+```{r}
+sce = readRDS('reduced_sce_PBMC.RDS')
+
+```
+
+## Run ACTIONet
+```{r}
+sce.reduced = reduce.sce(sce, reduced_dim = 50)
+
+ACTIONet.out = run.ACTIONet(sce.reduced, k_max = 20)
+
+```
+
+
+## Annotate celltypes
+```{r}
+marker.genes = readRDS('human_pbmc_marker.RDS')
+annot.out = annotate.cells.using.markers(ACTIONet.out = ACTIONet.out, sce = sce.reduced, marker.genes = marker.genes)
+updated.Labels = update.Labels(ACTIONet.out, annot.out$Labels)
+
+sce.reduced$Labels = updated.Labels
+```
+
+
+## Visualize ACTIONet
+```{r}
+cn = coreness(ACTIONet.out$ACTIONet)
+cn.pr = page_rank(ACTIONet.out$ACTIONet, personalized = cn)$vector
+
+plot.ACTIONet.igraph(ACTIONet.out, sce.reduced$Labels, node.size = 2, transparency.attr = cn.pr, trans.fact = 2)
+
+
+cairo_pdf('ACTIONet_celltypes_PBMC.pdf')
+plot.ACTIONet.igraph(ACTIONet.out, sce.reduced$Labels, node.size = 2, transparency.attr = cn.pr, trans.fact = 2)
+dev.off()
+
+```
+
+
+## Export results for future use
+```{r}
+  saveRDS(sce.reduced, file = 'reduced_sce_PBMC_annotated.RDS')
+  saveRDS(ACTIONet.out, file = 'ACTIONet_out_PBMC.RDS')
+
+```
+

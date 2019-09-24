@@ -1,5 +1,5 @@
 ---
-title: "SCINET demo"
+title: "SCINET demo (basic functionality)"
 output:
   html_document:
     df_print: paged
@@ -16,17 +16,19 @@ knitr::opts_chunk$set(
 
 require(SCINET)
 
-# For testing purposes
-Bcell.cols = which(sce$CellType == "B cell")
-marker.genes = c('CD19', 'CD22', 'CD4', 'CD8A', 'CD14')
-marker.rows = match(marker.genes, rownames(sce))
-
 ```
 
 
 ## Preprocessing using ACTIONet framework
 ```{r message=FALSE, warning=FALSE}
-sce = readRDS('../../input/datasets/Ding2019/HumanPBMC.RDS')
+sce = readRDS('reduced_sce_PBMC_annotated.RDS')
+
+ACTIONet.out = readRDS('ACTIONet_out_PBMC.RDS')
+
+# For testing purposes
+Bcell.cols = which(sce$Labels == "B cell")
+marker.genes = c('CD19', 'CD22', 'CD4', 'CD8A', 'CD14')
+marker.rows = match(marker.genes, rownames(sce))
 
 
 ```
@@ -34,16 +36,8 @@ sce = readRDS('../../input/datasets/Ding2019/HumanPBMC.RDS')
 
 ## Imputation
 ```{r}
-# depth = 20
-# thread_no = 8
-# sce = reduce.sce(sce)
-# ACTIONet.out = run.ACTIONet(sce, k_max = depth, thread_no = thread_no)
-# 
-# save(sce, ACTIONet.out, file = 'Ding_PBMC.RData')
 
-load('Ding_PBMC.RData')
-
-W = ACTIONet.out$signature.profile[, ACTIONet.out$core.out]
+W = ACTIONet.out$signature.profile[, ACTIONet.out$core.out$core.archs]
 H = ACTIONet.out$reconstruct.out$H_stacked[ACTIONet.out$core.out$core.archs, ]
 A =  W %*% H
 
@@ -68,12 +62,15 @@ ggplot(df, aes(x=activity, fill=gene)) +
 
 
 ## Estimate gene activities within the ACTIONet framework
-activity.scores.ACTIONet = compute_gene_activities_decoupled(archetypes = ACTIONet.out$signature.profile, H = ACTIONet.out$reconstruct.out$H_stacked , samples = Bcell.cols, thread_no = 8)
+activity.scores.ACTIONet = SCINET::compute_gene_activities_decoupled(archetypes = W, H = H , samples = Bcell.cols, thread_no = 8)
+
+rownames(activity.scores) = rownames(sce)
+rownames(activity.scores.ACTIONet) = rownames(sce)
 
 # Results should be identical
 delta.df = data.frame(ACTIONet = activity.scores.ACTIONet[marker.genes[1], ], generic = activity.scores[marker.genes[1], ])
 delta = delta.df$ACTIONet - delta.df$generic
-sum(delta)
+mean(delta)
 
 ```
 
@@ -211,7 +208,9 @@ print(paired.datasets$genes[order(topo.spec.withRef.subsampled.aggregated, decre
 ```{r}
 X = cbind(topo.spec.noRef=topo.spec.noRef, topo.spec.withRef=topo.spec.withRef, topo.spec.withRef.subsampled=topo.spec.withRef.subsampled, topo.spec.withRef.subsampled.aggregated=topo.spec.withRef.subsampled.aggregated)
 
-CC = cor(X)
+X[is.infinite(X)] = NA
+
+CC = cor(X, use = 'complete.obs')
 ComplexHeatmap::Heatmap(CC)
 
 ```

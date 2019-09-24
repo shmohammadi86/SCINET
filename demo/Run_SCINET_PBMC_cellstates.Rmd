@@ -1,0 +1,156 @@
+---
+title: "SCINET demo (basic functionality)"
+output:
+  html_document:
+    df_print: paged
+---
+
+## Housekeeping
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+	echo = TRUE,
+	message = FALSE,
+	warning = FALSE
+)
+require(SCINET)
+require(ACTIONet)
+
+```
+
+
+## Preprocessing using ACTIONet framework
+```{r message=FALSE, warning=FALSE}
+sce = readRDS('reduced_sce_PBMC_annotated.RDS')
+
+ACTIONet.out = readRDS('ACTIONet_out_PBMC.RDS')
+
+arch.annot = annotate.archetype(ACTIONet.out, sce$Labels)
+
+A = ACTIONet.out$signature.profile
+
+```
+
+## Read marker genes
+```{r}
+marker.genes = readRDS('human_pbmc_marker.RDS')
+positive.genes = sapply(marker.genes, function(gs) {
+  genes = intersect(rownames(sce), stringr::str_replace(gs[grep("+", gs, fixed = TRUE)], stringr::fixed("+"), ""))
+})
+```
+
+
+## Visualize unnormalized gene activity scores
+```{r}
+  genes = sort(unique(unlist(positive.genes)))
+  genes.idx = match(genes, rownames(sce))
+
+  sub.profile = A[genes.idx, ACTIONet.out$core.out$core.archs]
+  # sub.profile[sub.profile > 5] = 5
+  
+  rownames(sub.profile) = genes
+  colnames(sub.profile) = arch.annot$archetypeLabels[ACTIONet.out$core.out$core.archs]
+  
+  
+  Annot = levels(sce$Labels)
+	colCelltype.Pal = ggpubr::get_palette("d3", length(Annot))
+	names(colCelltype.Pal) = Annot
+	
+	require(ComplexHeatmap)
+  
+  ha_cols = HeatmapAnnotation(df = list(Celltype = colnames(sub.profile)), col = list(Celltype = colCelltype.Pal), annotation_legend_param = list(Celltype=list(title_gp = gpar(fontsize = 8), labels_gp = gpar(fontsize = 5))), which = "column")  
+  
+  gradPal = grDevices::colorRampPalette(rev(RColorBrewer::brewer.pal(n = 9, name = "RdYlBu")))(100)
+
+  Heatmap(sub.profile, col = gradPal, row_names_gp = gpar(fontsize = 6), column_names_gp = gpar(fontsize = 0), top_annotation = ha_cols, name = "Expression of marker genes", row_title = "Genes", column_title = "Cell states")
+  
+```
+
+
+## Estimate gene activity score within B-cell sub-population
+```{r}
+# It can be any imputed profile
+
+require(SCINET)
+activity.scores = SCINET::compute_gene_activities_full(A = A, thread_no = 8)
+
+rownames(activity.scores) = rownames(sce)
+colnames(activity.scores) = arch.annot$archetypeLabels
+
+```
+
+
+## Visualize normalized gene activity scores
+```{r}
+  genes = sort(unique(unlist(positive.genes)))
+  genes.idx = match(genes, rownames(sce))
+
+  sub.profile = activity.scores[genes.idx, ACTIONet.out$core.out$core.archs]
+
+  Annot = levels(sce$Labels)
+	colCelltype.Pal = ggpubr::get_palette("d3", length(Annot))
+	names(colCelltype.Pal) = Annot
+	
+	require(ComplexHeatmap)
+  
+  ha_cols = HeatmapAnnotation(df = list(Celltype = colnames(sub.profile)), col = list(Celltype = colCelltype.Pal), annotation_legend_param = list(Celltype=list(title_gp = gpar(fontsize = 8), labels_gp = gpar(fontsize = 5))), which = "column")  
+  
+  gradPal = grDevices::colorRampPalette(rev(RColorBrewer::brewer.pal(n = 9, name = "RdYlBu")))(100)
+
+  Heatmap(sub.profile, col = gradPal, row_names_gp = gpar(fontsize = 6), column_names_gp = gpar(fontsize = 0), top_annotation = ha_cols, name = "Expression of marker genes", row_title = "Genes", column_title = "Cell states")
+  
+```
+
+
+
+## Load GAAD network as the reference interactome 
+Downloaded from [GAAD](http://gaad.medgenius.info/Downloads/co-occurrence_of_gene_pairs_in_ADs.txt.gz)
+
+```{r}
+GAAD = readRDS('GAAD_net.RDS')
+paired.datasets = pair.datasets(GAAD, activity.scores)
+
+EL = get.edgelist(GAAD, names = FALSE)
+
+G.adj = as(get.adjacency(paired.datasets$net), 'dgTMatrix')
+
+edge.idx = (G.adj@i)*nrow(G.adj) + (G.adj@j+1)
+
+```
+
+
+
+```{r}
+
+nets = construct_cell_networks_noPrior(gene_activities = paired.datasets$activity.scores[, 1:10], thread_no = 8)
+
+
+```
+
+
+## Compute topological-specificity of genes in each network
+```{r}
+require(igraph)
+
+# core.topo.spec = sapply(cellstate.nets[ACTIONet.out$core.out$core.archs], function(Adj) {
+core.topo.spec = sapply(nets, function(Adj) {
+  G = graph_from_adjacency_matrix(Adj, mode = "undirected", weighted = TRUE)
+  V(G)$name = paired.datasets$genes
+  
+  topo.spec = topo.spec(G, sample_no = 1000)
+
+  return(topo.spec)
+})
+
+  colnames(core.topo.spec) = arch.annot$archetypeLabels[1:10]#ACTIONet.out$core.out$core.archs]
+  rownames(core.topo.spec) = paired.datasets$genes
+  
+```
+
+
+## Constrained networks
+```{r}
+cellstate.nets = construct_cell_networks(net = G.adj, gene_activities = paired.datasets$activity.scores, thread_no = 8)
+
+```
+
