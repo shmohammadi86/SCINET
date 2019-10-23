@@ -27,12 +27,16 @@ get.symPR.matrix <- function(adj, alpha_val) {
 }
 
 compute.genesets.compactness <- function(G, genesets, sample_no = 100, min.genes = 3) {
-  # From: "Systematic Evaluation of Molecular Networks for Discovery of Disease Genes"
-  nonisolated.vertices = which(degree(G) > 0)
+  nonisolated.vertices = which(igraph::degree(G) > 0)
   G = induced_subgraph(G, V(G)[nonisolated.vertices])
+  
+  if(is.null(names(genesets))) {
+	  names(genesets) = 1:length(genesets)
+  }
 
   set.seed(0)
   
+  # From: "Systematic Evaluation of Molecular Networks for Discovery of Disease Genes"
   m=-0.02935302
   b=0.74842057
   log_edge_count = log10(length(E(G)))
@@ -45,25 +49,21 @@ compute.genesets.compactness <- function(G, genesets, sample_no = 100, min.genes
   genes = V(G)$name
   N = length(genes)
   
-  specificity = V(G)$specificity # Z-score
-  names(specificity) = genes
-  specificity = 1 / (1 + exp(-specificity))
-
-
+  
   compactness = array(0, length(genesets))  
   for(i in 1:length(genesets)) {
-    R.utils::printf('\tGeneset %d/%d ', i, length(genesets)); 
-
-	geneset = genesets[[i]]
+    R.utils::printf('\t(%d/%d) %s ... ', i, length(genesets), names(genesets)[[i]]); 
+    
+    geneset = genesets[[i]]
     shared_genes = intersect(geneset, genes)
     idx = match(shared_genes, genes)
     K = length(idx)
-	R.utils::printf('(%d genes)\n', K)
-	if(K < min.genes)
-		next
+    
+  	if(K < min.genes)
+  		next
 	
     e_gs = sparseVector(1 / K, idx, N);
-    e_spec = sparseVector(specificity[idx], idx, N); 
+    e_spec = sparseVector(V(G)$specificity[idx], idx, N); 
     e_spec = e_spec / sum(e_spec)
     
     stat = t(e_gs) %*% Q %*% e_spec
@@ -78,7 +78,7 @@ compute.genesets.compactness <- function(G, genesets, sample_no = 100, min.genes
     
     E_spec_rand = sapply(1:sample_no, function(i) {
       rand_idx = rand_samples[,i]
-      e_spec_rand = as.numeric(sparseVector(specificity[rand_idx], rand_idx, N));
+      e_spec_rand = as.numeric(sparseVector(V(G)$specificity[rand_idx], rand_idx, N));
       return(e_spec_rand)} )
 
     ss = colSums(E_spec_rand)
@@ -88,11 +88,14 @@ compute.genesets.compactness <- function(G, genesets, sample_no = 100, min.genes
     rand_stats = diag(t(E_gs_rand) %*% Q %*% E_spec_rand);
     
     compactness[i] = as.numeric((stat - mean(rand_stats)) / sd(rand_stats))
+
+        
+    R.utils::printf('%.2f\n', compactness[i])
+    
   }
   
   return(compactness)
 }
-
 
 
 prioritize.geneset.LOO <- function(G, geneset, sample_no = 100) {
