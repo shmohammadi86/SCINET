@@ -49,7 +49,10 @@ compute.genesets.compactness <- function(G, genesets, sample_no = 100, min.genes
   genes = V(G)$name
   N = length(genes)
   
-  
+  specificity = V(G)$specificity # Z-score
+  names(specificity) = genes
+
+
   compactness = array(0, length(genesets))  
   for(i in 1:length(genesets)) {
     R.utils::printf('\t(%d/%d) %s ... ', i, length(genesets), names(genesets)[[i]]); 
@@ -63,10 +66,10 @@ compute.genesets.compactness <- function(G, genesets, sample_no = 100, min.genes
   		next
 	
     e_gs = sparseVector(1 / K, idx, N);
-    e_spec = sparseVector(V(G)$specificity[idx], idx, N); 
+    e_spec = sparseVector(specificity[idx], idx, N); 
     e_spec = e_spec / sum(e_spec)
     
-    stat = t(e_gs) %*% Q %*% e_spec
+    stat = Matrix::t(e_gs) %*% Q %*% e_spec
     
     rand_samples = replicate(sample_no, sample(N, K))
 
@@ -78,14 +81,14 @@ compute.genesets.compactness <- function(G, genesets, sample_no = 100, min.genes
     
     E_spec_rand = sapply(1:sample_no, function(i) {
       rand_idx = rand_samples[,i]
-      e_spec_rand = as.numeric(sparseVector(V(G)$specificity[rand_idx], rand_idx, N));
+      e_spec_rand = as.numeric(sparseVector(specificity[rand_idx], rand_idx, N));
       return(e_spec_rand)} )
 
     ss = colSums(E_spec_rand)
     ss[ss == 0] = 1
     E_spec_rand = scale(E_spec_rand, center = FALSE, scale = ss)
         
-    rand_stats = diag(t(E_gs_rand) %*% Q %*% E_spec_rand);
+    rand_stats = diag(Matrix::t(E_gs_rand) %*% Q %*% E_spec_rand);
     
     compactness[i] = as.numeric((stat - mean(rand_stats)) / sd(rand_stats))
 
@@ -173,6 +176,8 @@ read.edgelist <- function(fname, header = TRUE, src.col = 1, dst.col = 2) {
 
 pair.datasets <- function(G, activity.scores, selected.genes = NULL) {
   require(igraph)
+  require(Matrix)
+  
   g1 = V(G)$name
   g2 = rownames(activity.scores)
   common.genes = intersect(g1, g2)
@@ -219,8 +224,8 @@ run.SCINET <- function(G, expression, samples = NA, genes = NA, total_subsamples
 }
 
 topo.spec <- function(G, sample_no = 100) {
-  d = degree(G)
-  w = strength(G)  
+  d = igraph::degree(G)
+  w = igraph::strength(G)  
   
   edge_weights = E(G)$weight
   N = length(edge_weights)
