@@ -103,7 +103,7 @@ compute.genesets.compactness <- function(G, genesets, sample_no = 100, min.genes
 
 prioritize.geneset.LOO <- function(G, geneset, sample_no = 100) {
   # From: "Systematic Evaluation of Molecular Networks for Discovery of Disease Genes"
-  nonisolated.vertices = which(degree(G) > 0)
+  nonisolated.vertices = which(igraph::degree(G) > 0)
   G = induced_subgraph(G, V(G)[nonisolated.vertices])
   genes = V(G)$name
 
@@ -125,7 +125,6 @@ prioritize.geneset.LOO <- function(G, geneset, sample_no = 100) {
   
   specificity = V(G)$specificity # Z-score
   names(specificity) = genes
-  specificity = 1 / (1 + exp(-specificity))
 
   seeds = intersect(geneset, genes)
   seed_ids = match(seeds, genes) 

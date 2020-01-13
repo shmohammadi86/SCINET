@@ -49,6 +49,15 @@ mat compute_gene_activities_full(mat A, int thread_no = 4) {
 
 // [[Rcpp::depends(RcppArmadillo)]]
 // [[Rcpp::export]]
+mat RIN_transform(mat A, int thread_no = 4) {
+	mat Z = SCINET::RIN_transform(A, thread_no);
+	
+	return Z;		
+}
+
+
+// [[Rcpp::depends(RcppArmadillo)]]
+// [[Rcpp::export]]
 mat subsample_gene_activities(mat A, uvec rows, uvec samples, int total_subsamples = 30, int cells_per_subsample = 10, int thread_no = 4, int seed = 0) {		
 	int K = samples.n_elem;
 	int M = rows.n_elem;
