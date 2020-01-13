@@ -13,6 +13,10 @@ compute_gene_activities_full <- function(A, thread_no = 4L) {
     .Call(`_SCINET_compute_gene_activities_full`, A, thread_no)
 }
 
+RIN_transform <- function(A, thread_no = 4L) {
+    .Call(`_SCINET_RIN_transform`, A, thread_no)
+}
+
 subsample_gene_activities <- function(A, rows, samples, total_subsamples = 30L, cells_per_subsample = 10L, thread_no = 4L, seed = 0L) {
     .Call(`_SCINET_subsample_gene_activities`, A, rows, samples, total_subsamples, cells_per_subsample, thread_no, seed)
 }

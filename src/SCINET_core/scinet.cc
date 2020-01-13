@@ -70,6 +70,34 @@ mat sampleUnif(int l, int m, double a, double b, int seed) {
 
 
 namespace SCINET {
+	mat RIN_transform(mat A, int thread_no = 4) {
+		int M = A.n_rows;
+		int N = A.n_cols;
+			
+		printf("Normalizing columns (samples) ... ");
+		mat Zr = zeros(M, N);
+		#pragma omp parallel for num_threads(thread_no) 
+		for(int i = 0; i < N; i++) { // One sample at a time			
+			vec v = A.col(i);
+								
+			uvec row_perm_forward = stable_sort_index(v);
+			uvec row_perm = stable_sort_index(row_perm_forward);	
+			vec p = (row_perm + ones(size(row_perm))) / (row_perm.n_elem + 1);
+			
+			vec v_RINT = zeros(size(p));
+			for (int j = 0; j < p.n_elem; j++) {
+				double norm_inv = r8_normal_01_cdf_inverse ( p(j) );
+				v_RINT(j) = norm_inv;
+			}
+
+			Zr.col(i) = v_RINT;						
+		}
+		printf("done\n");
+
+		return(Zr);
+	}
+	
+
 	mat compute_gene_activities_full(mat A, int thread_no = 4) {
 		int M = A.n_rows;
 		int N = A.n_cols;
@@ -78,6 +106,7 @@ namespace SCINET {
 		
 		printf("Normalizing columns (samples) ... ");
 		mat Zr = zeros(M, N);
+		#pragma omp parallel for num_threads(thread_no) 
 		for(int i = 0; i < N; i++) { // One sample at a time			
 			vec v = A.col(i);
 								
@@ -97,6 +126,7 @@ namespace SCINET {
 		
 		printf("Normalizing rows (genes) ... ");
 		mat Zc = zeros(M, N);
+		#pragma omp parallel for num_threads(thread_no) 
 		for(int i = 0; i < M; i++) { // One gene at a time			
 			vec v = trans(A.row(i));
 			
@@ -120,8 +150,6 @@ namespace SCINET {
 		return(Z);
 	}
 	
-
-
 	mat compute_gene_activities(mat A, uvec samples, bool consider_baseline_expression = true, int thread_no = 4) {
 		int M = A.n_rows;
 		int N = A.n_cols;

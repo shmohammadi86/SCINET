@@ -51,6 +51,10 @@ namespace SCINET {
 
 	// Construct cell networks and aggregates edge p-values
 	field<sp_mat> construct_cell_networks_summary(sp_mat net, mat gene_activities, int total_subsamples, int cells_per_subsample, int seed, int thread_no);
+	
+	// Baseline RIN
+	mat RIN_transform(mat A, int thread_no);
+	
 }
 
 #endif
