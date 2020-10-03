@@ -11,7 +11,6 @@
 using namespace arma;
 using namespace std;
 
-#include <omp.h>
 #include <stdio.h>
 #include <vector>
 #include <string>
