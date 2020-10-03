@@ -107,8 +107,6 @@ prioritize.geneset.LOO <- function(G, geneset, sample_no = 100) {
   G = induced_subgraph(G, V(G)[nonisolated.vertices])
   genes = V(G)$name
 
-  gene.score = array(-Inf, N)
-  rownames(gene.score) = geneset
   
   set.seed(0)
   
@@ -123,15 +121,19 @@ prioritize.geneset.LOO <- function(G, geneset, sample_no = 100) {
 
   N = length(genes)
   
-  specificity = V(G)$specificity # Z-score
+  specificity = V(G)$specificity # pre-normalized in [0, 1]
   names(specificity) = genes
 
   seeds = intersect(geneset, genes)
   seed_ids = match(seeds, genes) 
 
+  gene.score = array(-Inf, length(seeds))
+  rownames(gene.score) = seeds
+  
   rest = setdiff(1:N, seed_ids)  
   for (i in 1:length(seeds)) {
     seed_id = seed_ids[i]
+    print(i)
     idx = setdiff(seed_ids, seed_id)
 
     e_gs = as.numeric(sparseVector(specificity[idx], idx, N));
@@ -148,7 +150,6 @@ prioritize.geneset.LOO <- function(G, geneset, sample_no = 100) {
   
   return(gene.score)
 }
-
 
 
 
