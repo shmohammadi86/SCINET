@@ -1,6 +1,8 @@
 #include <scinet.h>
 #include <cdflib.hpp>
-
+#include <ctime>
+#include <thread>
+#include <atomic>
 /* 
  * From:Milton Abramowiz and Irene A Stegun. Handbook of Mathematical Functions.  National Bureau of Standards, 1964. 
  * Imp: http://finance.bi.no/~bernt/gcc_prog/
@@ -70,14 +72,73 @@ mat sampleUnif(int l, int m, double a, double b, int seed) {
 
 
 namespace SCINET {
+	template<class Function>
+	inline void ParallelFor(size_t start, size_t end, size_t thread_no, Function fn) {
+		if (thread_no <= 0) {
+			thread_no = std::thread::hardware_concurrency();
+		}
+
+		if (thread_no == 1) {
+			for (size_t id = start; id < end; id++) {
+				fn(id, 0);
+			}
+		} else {
+			std::vector<std::thread> threads;
+			std::atomic<size_t> current(start);
+
+			// keep track of exceptions in threads
+			// https://stackoverflow.com/a/32428427/1713196
+			std::exception_ptr lastException = nullptr;
+			std::mutex lastExceptMutex;
+
+			for (size_t threadId = 0; threadId < thread_no; ++threadId) {
+				threads.push_back(std::thread([&, threadId] {
+					while (true) {
+						size_t id = current.fetch_add(1);
+
+						if ((id >= end)) {
+							break;
+						}
+
+						try {
+							fn(id, threadId);
+						} catch (...) {
+							std::unique_lock<std::mutex> lastExcepLock(lastExceptMutex);
+							lastException = std::current_exception();
+							/*
+							 * This will work even when current is the largest value that
+							 * size_t can fit, because fetch_add returns the previous value
+							 * before the increment (what will result in overflow
+							 * and produce 0 instead of current + 1).
+							 */
+							current = end;
+							break;
+						}
+					}
+				}));
+			}
+			for (auto &thread : threads) {
+				thread.join();
+			}
+			if (lastException) {
+				std::rethrow_exception(lastException);
+			}
+		}
+
+	}
+
+	
 	mat RIN_transform(mat A, int thread_no = 4) {
 		int M = A.n_rows;
 		int N = A.n_cols;
 			
 		printf("Normalizing columns (samples) ... ");
 		mat Zr = zeros(M, N);
+		/*
 		#pragma omp parallel for num_threads(thread_no) 
 		for(int i = 0; i < N; i++) { // One sample at a time			
+		*/
+		ParallelFor(0, N, thread_no, [&](size_t i, size_t threadId) {
 			vec v = A.col(i);
 								
 			uvec row_perm_forward = stable_sort_index(v);
@@ -91,7 +152,7 @@ namespace SCINET {
 			}
 
 			Zr.col(i) = v_RINT;						
-		}
+		});
 		printf("done\n");
 
 		return(Zr);
@@ -106,8 +167,11 @@ namespace SCINET {
 		
 		printf("Normalizing columns (samples) ... ");
 		mat Zr = zeros(M, N);
+		/*
 		#pragma omp parallel for num_threads(thread_no) 
 		for(int i = 0; i < N; i++) { // One sample at a time			
+		*/	
+		ParallelFor(0, N, thread_no, [&](size_t i, size_t threadId) {			
 			vec v = A.col(i);
 								
 			uvec row_perm_forward = stable_sort_index(v);
@@ -121,13 +185,16 @@ namespace SCINET {
 			}
 
 			Zr.col(i) = v_RINT;						
-		}
+		});
 		printf("done\n");
 		
 		printf("Normalizing rows (genes) ... ");
 		mat Zc = zeros(M, N);
+		/*
 		#pragma omp parallel for num_threads(thread_no) 
 		for(int i = 0; i < M; i++) { // One gene at a time			
+		*/
+		ParallelFor(0, M, thread_no, [&](size_t i, size_t threadId) {			
 			vec v = trans(A.row(i));
 			
 			uvec row_perm_forward = stable_sort_index(v);
@@ -141,7 +208,7 @@ namespace SCINET {
 			}
 			
 			Zc.row(i) = trans(v_RINT);
-		}	
+		});
 		printf("done\n");
 		
 
@@ -178,10 +245,12 @@ namespace SCINET {
 	
 		
 		printf("Computing Rank-Based Inverse Normal Transformation\n");	
-
+		/*
 		#pragma omp parallel for num_threads(thread_no) 
 		for(int i = 0; i < M; i++) { // One gene at a time
-			
+		*/
+		ParallelFor(0, M, thread_no, [&](size_t i, size_t threadId) {			
+	
 			rowvec v = A.row(i);
 			
 			uvec v_perm_forward = stable_sort_index(v);
@@ -201,7 +270,7 @@ namespace SCINET {
 			else {
 				Z.row(i) = v_RINT;
 			}			
-		}
+		});
 		
 		printf("done\n");
 		return(Z);
@@ -236,9 +305,11 @@ namespace SCINET {
 		
 		printf("Computing Rank-Based Inverse Normal Transformation\n");	
 		
+		/*
 		#pragma omp parallel for num_threads(thread_no) 
 		for(int i = 0; i < M; i++) { // One gene at a time
-			
+		*/
+		ParallelFor(0, M, thread_no, [&](size_t i, size_t threadId) {						
 			rowvec v = archetypes.row(i)*H;
 			
 			uvec v_perm_forward = stable_sort_index(v);
@@ -258,7 +329,7 @@ namespace SCINET {
 			else {
 				Z.row(i) = v_RINT;
 			}			
-		}
+		});
 		
 		printf("done\n");
 		return(Z);
@@ -269,8 +340,11 @@ namespace SCINET {
 		
 		
 		mat Z = zeros(rows.n_elem, total_subsamples);	
+		/*
 		#pragma omp parallel for num_threads(thread_no) 		
 		for(int i = 0; i < rows.n_elem; i++) { // One gene at a time			
+		*/
+		ParallelFor(0, rows.n_elem, thread_no, [&](size_t i, size_t threadId) {			
 			int r = rows(i);
 			
 			rowvec v = A.row(r);
@@ -288,7 +362,7 @@ namespace SCINET {
 			for(int j = 0; j < total_subsamples; j++) {
 				Z(i, j) = sum(v_RINT(subsamples.col(j)));
 			}
-		}
+		});
 		// Re-adjust the variance to become a standard normal distribution
 		Z /= sqrt(cells_per_subsample);
 
@@ -328,8 +402,11 @@ namespace SCINET {
 		
 		
 		mat Z = zeros(rows.n_elem, total_subsamples);	
+		/*
 		#pragma omp parallel for num_threads(thread_no) 		
 		for(int i = 0; i < rows.n_elem; i++) { // One gene at a time			
+		*/
+		ParallelFor(0, rows.n_elem, thread_no, [&](size_t i, size_t threadId) {		
 			int r = rows(i);
 			
 			rowvec v = archetypes.row(r)*H;
@@ -347,7 +424,7 @@ namespace SCINET {
 			for(int j = 0; j < total_subsamples; j++) {
 				Z(i, j) = sum(v_RINT(subsamples.col(j)));
 			}
-		}
+		});
 		// Re-adjust the variance to become a standard normal distribution
 		Z /= sqrt(cells_per_subsample);
 
@@ -392,8 +469,11 @@ namespace SCINET {
 		int total_cells = 0;
 		
 		field<mat> networks(K);
+		/*
 		#pragma omp parallel for num_threads(thread_no)
 		for(int k = 0; k < K; k++) {
+		*/
+		ParallelFor(0, K, thread_no, [&](size_t k, size_t threadId) {					
 			vec z = gene_activities.col(k);
 			
 			mat network = zeros(M, M);			
@@ -421,7 +501,7 @@ namespace SCINET {
 				perc++;
 			}
 			
-		}
+		});
 				
 		return(networks);
 	}
@@ -437,8 +517,11 @@ namespace SCINET {
 		int perc = 0;
 		int total_cells = 0;
 		
+		/*
 		#pragma omp parallel for num_threads(thread_no)
 		for(int k = 0; k < K; k++) {
+		*/
+		ParallelFor(0, K, thread_no, [&](size_t k, size_t threadId) {		
 			vec z = gene_activities.col(k);
 						
 			vec pvals = ones(nnz);
@@ -466,7 +549,7 @@ namespace SCINET {
 				printf("%d %%\n", perc);
 			}
 			
-		}
+		});
 		
 		return pvals_mat;
 	}
@@ -542,14 +625,16 @@ namespace SCINET {
 
 		umat subsamples = conv_to<umat>::from(round(sampleUnif(cells_per_subsample, total_subsamples, 0, pvals_mat.n_cols-1, seed)));
 		
+		/*
 		#pragma omp parallel for num_threads(thread_no)
 		for(int i = 0; i < total_subsamples; i++) {
-
+		*/
+		ParallelFor(0, total_subsamples, thread_no, [&](size_t i, size_t threadId) {
 			mat subPvals = pvals_mat.cols(subsamples.col(i));
 			
 			// From: The harmonic mean p-value for combining dependent tests (Daniel J. Wilson, 2019)
 			aggregate_pvals.col(i) = 1 / ((sum(1 / subPvals, 1) / cells_per_subsample));			
-		}
+		});
 		
 		mat logPvals = -log10(aggregate_pvals);		
 		for(int k = 0; k < K; k++) {
