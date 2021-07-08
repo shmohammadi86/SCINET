@@ -599,7 +599,7 @@ namespace SCINET {
 	field<sp_mat> construct_cell_networks_summary(sp_mat net, mat gene_activities, int total_subsamples = 30, int cells_per_subsample = 10, int seed = 0, int thread_no = 4) {
 		int M = gene_activities.n_rows;
 		int K = gene_activities.n_cols;
-		field<sp_mat> networks(K);
+		field<sp_mat> networks(total_subsamples);
 
 		if(net.n_rows != M) {
 			fprintf(stderr, "Error:: Number of genes in the gene activity score matrix (%d) doesn't match the number of nodes in the input network (%d)\n", gene_activities.n_rows, net.n_rows);
@@ -637,15 +637,15 @@ namespace SCINET {
 		});
 		
 		mat logPvals = -log10(aggregate_pvals);		
-		for(int k = 0; k < K; k++) {
+		for(int i = 0; i < total_subsamples; i++) {
 
-			vec weights = logPvals.col(k);
+			vec weights = logPvals.col(i);
 
 			sp_mat network = sp_mat(subs, weights, M, M);
 			network = (network + trans(network));
 			network.diag().zeros();
 			
-			networks(k) = network;			
+			networks(i) = network;			
 		}
 				
 		return(networks);
