@@ -1,0 +1,40 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite the article below."
+title: "SCINET: cell-type-specific interactome reconstruction at single-cell resolution"
+abstract: >-
+  SCINET rescores the edges of a reference interactome using gene activity
+  scores derived from single-cell expression, subsampling cells so that each
+  edge receives a distribution rather than a point estimate. The result is one
+  weighted network per cell type or cell state.
+type: software
+repository-code: "https://github.com/shmohammadi86/SCINET"
+license: GPL-2.0-or-later
+authors:
+  - family-names: "Mohammadi"
+    given-names: "Shahin"
+    orcid: "https://orcid.org/0000-0001-8734-2326"
+  - family-names: "Davila-Velderrain"
+    given-names: "Jose"
+  - family-names: "Kellis"
+    given-names: "Manolis"
+keywords:
+  - single-cell
+  - interactome
+  - network inference
+  - cell type specificity
+preferred-citation:
+  type: article
+  title: "Reconstruction of Cell-type-Specific Interactomes at Single-Cell Resolution"
+  journal: "Cell Systems"
+  volume: 9
+  issue: 6
+  start: 559
+  year: 2019
+  doi: "10.1016/j.cels.2019.10.007"
+  authors:
+    - family-names: "Mohammadi"
+      given-names: "Shahin"
+    - family-names: "Davila-Velderrain"
+      given-names: "Jose"
+    - family-names: "Kellis"
+      given-names: "Manolis"

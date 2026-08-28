@@ -1,0 +1,40 @@
+name: R-CMD-check
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ${{ matrix.config.os }}
+    name: ${{ matrix.config.os }} / R ${{ matrix.config.r }}
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+          - { os: ubuntu-latest,  r: 'release' }
+          - { os: ubuntu-latest,  r: 'oldrel-1' }
+          - { os: macos-latest,   r: 'release' }
+    env:
+      R_KEEP_PKG_SOURCE: yes
+      GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: ${{ matrix.config.r }}
+          use-public-rspm: true
+
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          extra-packages: any::rcmdcheck
+          needs: check
+
+      - uses: r-lib/actions/check-r-package@v2
+        with:
+          # demo/ carries large pre-computed inputs; skip the size note
+          args: 'c("--no-manual", "--no-build-vignettes", "--ignore-vignettes")'
+          error-on: '"error"'

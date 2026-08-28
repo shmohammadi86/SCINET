@@ -3,10 +3,26 @@ Type: Package
 Title: Single-Cell Imputation and NETwork inference
 Version: 1.0
 Date: 2018-06-01
-Author: Shahin Mohammadi
-Maintainer: Shahin Mohammadi <mohammadi@broadinstitute.org>
-Description: This method computes a distribution over edges of a scaffold network and allows to perform differential network analysis
+Authors@R: c(
+    person("Shahin", "Mohammadi", email = "shahin.mohammadi@gmail.com",
+        role = c("cre", "aut"), comment = c(ORCID = "0000-0001-8734-2326")),
+    person("Jose", "Davila-Velderrain", role = "aut"),
+    person("Manolis", "Kellis", role = "aut")
+    )
+Description: SCINET reconstructs cell-type- and cell-state-specific
+    interactomes at single-cell resolution. It transforms single-cell
+    expression into gene activity scores, subsamples cells to stabilise those
+    scores, and rescores the edges of a reference interactome so that each
+    cell population receives its own weighted network. The resulting ensemble
+    supports analysis of gene-interaction dynamics and of the cell-type
+    specificity of disease-associated perturbations.
 License: GPL (>= 2)
-Imports: Rcpp (>= 0.12.12)
+Imports: Rcpp (>= 0.12.12), Matrix, igraph, methods, stats, utils
 LinkingTo: Rcpp,RcppArmadillo
+Suggests: knitr, rmarkdown, testthat (>= 3.0.0)
+URL: https://github.com/shmohammadi86/SCINET
+BugReports: https://github.com/shmohammadi86/SCINET/issues
+Encoding: UTF-8
+SystemRequirements: C++17
+LazyData: true
 RoxygenNote: 6.1.1

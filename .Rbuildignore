@@ -1,0 +1,7 @@
+^demo$
+^\.github$
+^.*\.Rproj$
+^\.Rproj\.user$
+^README\.md$
+^CITATION\.cff$
+^\.gitignore$
