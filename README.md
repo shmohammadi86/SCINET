@@ -99,8 +99,13 @@ Worked vignettes are under `demo/`, covering the basic pipeline, the
 ACTIONet-decoupled path, and cell-state rather than cell-type networks.
 
 > The `demo/` folder carries roughly 200 MB of pre-computed `.RDS` inputs so
-> that the vignettes run as written. Clone with `--depth 1` if you only want
-> the package.
+> that the vignettes run as written. These are stored with
+> [Git LFS](https://git-lfs.com); run `git lfs install` before cloning, or
+> `git lfs pull` in an existing clone, to get the real files rather than
+> pointer stubs. Installing the package does not need them: `demo/` is listed
+> in `.Rbuildignore`, and `devtools::install_github` works whether or not you
+> have Git LFS. The bundled `PCNet` and `MIPPIE` networks are ordinary files,
+> not LFS objects, so `data(PCNet)` always works.
 
 ## Function reference
 
